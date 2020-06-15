@@ -11,4 +11,10 @@ numpy, scipy, pandas, scikit-learn, docopt
 
 # Usage
 
-Call `uk.co.ramp.exec.run`
+Call `uk.co.ramp.exec.param4ramp`, and you get the list of command-line options.
+
+```
+python param4ramp.py 
+```
+
+
