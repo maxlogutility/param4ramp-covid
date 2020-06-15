@@ -1,2 +1,14 @@
 # param4ramp-covid
-Parameter generation and sensitivty analysis for Scottish Covid
+
+Sensitivty analysis for Contact Tracing Model in RAMP COVID-19 Project.
+
+Randomly generate samples of model parameters, and perform
+regression between the input parameters and output time-series of SEIR.
+
+# Requirement
+
+numpy, scipy, pandas, scikit-learn, docopt
+
+# Usage
+
+Call `uk.co.ramp.exec.run`
