@@ -1,9 +1,9 @@
-"""Parameter Sensitivity Analysis for Contact Tracing Model.
+"""Random Drawing of (Parameter, Output Statistic) Samples for Sensitivity Analysis
 
 Usage:
-  param4ramp.py <OUTPUT_DIR> [--n-simulations=<n_sim>] [--seed=<seed>] [--java-project-dir=<JPDIR>] [--input-locations-file=<ILFILE>] [--output-summary-file=<OSFILE>] [--tmp-dir=<TMPDIR>]
-  param4ramp.py (-h | --help)
-  param4ramp.py --version
+  draw_parameters.py <OUTPUT_DIR> [--n-simulations=<n_sim>] [--seed=<seed>] [--java-project-dir=<JPDIR>] [--input-locations-file=<ILFILE>] [--output-summary-file=<OSFILE>] [--tmp-dir=<TMPDIR>]
+  draw_parameters.py (-h | --help)
+  draw_parameters.py --version
 
 Options:
   -h --help                       Show this screen.
@@ -25,6 +25,21 @@ from os.path import expanduser
 from docopt import docopt
 from uk.co.ramp.gencfg.disease import DiseaseSettings
 from uk.co.ramp.gencfg.population import PopulationSettings
+
+loss_names = ['total_severity', 'total_death']
+
+def losses(output_summary):
+    """
+    Returns a list of negative utility, where each element is a function of the entire output time-series.
+    In production, this part should be provided from an external file.
+    
+    Examples considerable are
+        Total number of deaths
+        DTW distance between the output and observations in the real world (when doing parameter estimation)
+    """
+    return [output_summary['sev'].sum(), output_summary['d'].sum()]
+    
+
 
 if __name__ == '__main__':
     args = docopt(__doc__, version='0.0.1')
@@ -52,6 +67,7 @@ if __name__ == '__main__':
     
     X_columns = []
     X = []
+    Y = []
     for trial in range(n_simulations):
         X_t = []
     
@@ -108,14 +124,18 @@ if __name__ == '__main__':
         X.append(np.concatenate(X_t).reshape(1, -1))
     
         # Read the summary results file and calculate the summary statistic
-        Y = pd.read_csv('{}/{}'.format(java_project_dir, output_summary_file)).set_index('time')
-        print(Y)
-        
+        output_summary = pd.read_csv('{}/{}'.format(java_project_dir, output_summary_file)).set_index('time')
+        Y.append(np.array(losses(output_summary)).reshape(1,-1))
     
     X = pd.DataFrame(
         data=np.vstack(tuple(X)),
         index=np.arange(n_simulations),
         columns=X_columns
+        )
+    Y = pd.DataFrame(
+        data=np.vstack(tuple(Y)),
+        index=np.arange(n_simulations),
+        columns=loss_names
         )
     
     try:
@@ -123,4 +143,5 @@ if __name__ == '__main__':
     except:
         pass
     
-    X.to_csv('{}/parameter_samples.csv'.format(outdir))
+    X.to_csv('{}/input_parameter_samples.csv'.format(outdir))
+    Y.to_csv('{}/output_loss_samples.csv'.format(outdir))
