@@ -9,7 +9,7 @@ from setuptools import setup, find_packages
 with open("README.md", "r") as readme_file:
     readme = readme_file.read()
 
-requirements = ["numpy>=1", "pandas>=1", "scikit-learn>=0.21", "docopt>=0.6"]
+requirements = ["numpy>=1", "pandas>=1", "scikit-learn>=0.21", "docopt>=0.6", "shape>=0.35", "matplotlib>=3.0.0"]
 
 setup(
     name="param4ramp-covid",

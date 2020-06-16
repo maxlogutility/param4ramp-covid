@@ -7,7 +7,7 @@ regression between the input parameters and output time-series of SEIR.
 
 # Requirement
 
-numpy, scipy, pandas, scikit-learn, docopt
+numpy, scipy, pandas, scikit-learn, docopt, shap, matplotlib
 
 # Usage
 

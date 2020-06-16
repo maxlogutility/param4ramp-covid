@@ -18,6 +18,9 @@ import pandas as pd
 import os
 from docopt import docopt
 from sklearn.ensemble import ExtraTreesRegressor
+import shap
+from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
     args = docopt(__doc__, version='0.0.1')
@@ -37,6 +40,11 @@ if __name__ == '__main__':
     n = X.shape[0]
     
     ms_list = np.unique(np.round(np.logspace(np.log10(2.0), np.log10(np.min([1000, n / 2])), 10)).astype(int))
+
+    try:
+        os.mkdir(outdir)
+    except:
+        pass
 
     imp_biased = []
     imp_unbiased = []
@@ -80,6 +88,23 @@ if __name__ == '__main__':
         fimp /= fimp.sum()
         imp_unbiased.append(fimp.reshape(-1, 1))
         
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(X)
+        
+        with PdfPages('{}/{}.pdf'.format(outdir, metric)) as pdf:
+            plt.figure(figsize=(6, 6))
+            shap.summary_plot(shap_values, X, show=False)
+            plt.title('Datapoint-specific sensitivities to {}'.format(metric))
+            pdf.savefig()
+            plt.close()
+
+            for xcol in X.columns:
+                plt.figure(figsize=(6, 6))
+                shap.dependence_plot(xcol, shap_values, X, show=False)
+                plt.title('How interaction with {} affects {}'.format(xcol, metric))
+                pdf.savefig()
+                plt.close()
+        
     imp_biased = pd.DataFrame(
         data=np.hstack(tuple(imp_biased)),
         index=X.columns,
@@ -91,11 +116,6 @@ if __name__ == '__main__':
         columns=Y.columns
         )
 
-    try:
-        os.mkdir(outdir)
-    except:
-        pass
-    
     imp_biased.to_csv('{}/relative_importance.biased.csv'.format(outdir))
     imp_unbiased.to_csv('{}/relative_importance.unbiased.csv'.format(outdir))
         
