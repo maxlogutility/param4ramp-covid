@@ -18,6 +18,8 @@ import pandas as pd
 import os
 from docopt import docopt
 from sklearn.ensemble import ExtraTreesRegressor
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import train_test_split
 import shap
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
@@ -46,53 +48,45 @@ if __name__ == '__main__':
     except:
         pass
 
-    imp_biased = []
-    imp_unbiased = []
+    imp = []
     for metric in Y.columns:
         # Step 1. Fitting a non-linear extra-trees regressor with out-of-bag model selection
-        oob_score = [ExtraTreesRegressor(
-            n_estimators=100,
-            criterion='mse',
-            max_depth=None,
-            bootstrap=True,
-            oob_score=True,
-            min_samples_split=ms,
-            random_state=seed).fit(X, Y[metric]).oob_score_ for ms in ms_list]
-        best_ms = ms_list[np.argmin(oob_score)]
-    
-        model = ExtraTreesRegressor(
-            n_estimators=300,
-            criterion='mse',
-            max_depth=None,
-            bootstrap=True,
-            oob_score=True,
-            min_samples_split=best_ms,
-            random_state=seed).fit(X, Y[metric])
+        X_train, X_test, y_train, y_test = train_test_split(X, Y[metric], test_size=0.5, random_state=1234)
         
+        model = GridSearchCV(
+            estimator=ExtraTreesRegressor(
+                n_estimators=100,
+                criterion='mse',
+                max_depth=None,
+                bootstrap=True,
+                oob_score=True,
+                random_state=seed),
+            param_grid={
+                'min_samples_split': ms_list,
+                'max_features': [int(1), 0.33, 1.0]
+                },
+            scoring='r2'
+            # scoring='neg_mean_squared_error'
+        ).fit(X_train, y_train)
+       
         # This is a biased but useful importance estimate.
-        fimp = model.feature_importances_
+        fimp = model.best_estimator_.feature_importances_
         fimp /= fimp.sum()
-        imp_biased.append(fimp.reshape(-1, 1))
+        imp.append(fimp.reshape(-1, 1))
     
-        # This is an unbiased but high-variance estimate.
-        model0 = ExtraTreesRegressor(
-            n_estimators=300,
-            criterion='mse',
-            max_features=int(1),
-            max_depth=None,
-            bootstrap=True,
-            oob_score=True,
-            min_samples_split=best_ms,
-            random_state=seed).fit(X, Y[metric])
-        fimp = model0.feature_importances_
-        fimp /= fimp.sum()
-        imp_unbiased.append(fimp.reshape(-1, 1))
-        
-        explainer = shap.TreeExplainer(model)
+        explainer = shap.TreeExplainer(model.best_estimator_)
         shap_values = explainer.shap_values(X)
         
         with PdfPages('{}/{}.pdf'.format(outdir, metric)) as pdf:
             plt.figure(figsize=(6, 6))
+            plt.scatter(model.predict(X_test), y_test)
+            plt.title('{}: Forecast of Meta Model vs Actual Target by Simulator'.format(metric))
+            plt.xlabel('Forecast')
+            plt.ylabel('Actual')
+            pdf.savefig()
+            plt.close()
+
+            plt.figure(figsize=(6, 12))
             shap.summary_plot(shap_values, X, show=False)
             plt.title('Datapoint-specific sensitivities to {}'.format(metric))
             pdf.savefig()
@@ -105,17 +99,11 @@ if __name__ == '__main__':
                 pdf.savefig()
                 plt.close()
         
-    imp_biased = pd.DataFrame(
-        data=np.hstack(tuple(imp_biased)),
-        index=X.columns,
-        columns=Y.columns
-        )
-    imp_unbiased = pd.DataFrame(
-        data=np.hstack(tuple(imp_unbiased)),
+    imp = pd.DataFrame(
+        data=np.hstack(tuple(imp)),
         index=X.columns,
         columns=Y.columns
         )
 
-    imp_biased.to_csv('{}/relative_importance.biased.csv'.format(outdir))
-    imp_unbiased.to_csv('{}/relative_importance.unbiased.csv'.format(outdir))
+    imp.to_csv('{}/relative_importance.csv'.format(outdir))
         
